@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>pathgenerator</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,14 +29,7 @@
       font-family: 'Source Sans 3', sans-serif;
     }
 
-    /* CRITICAL MOBILE TOUCH FIX: Purely CSS based to prevent text selection and scroll hijacking */
-    body, #canvas-container, canvas, #mini-canvas {
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    }
-
+    /* CRITICAL FIX: Allow scrolling on the body, but prevent text selection globally */
     body {
       background-color: var(--bg);
       color: var(--black);
@@ -47,6 +40,15 @@
       gap: 20px;
       align-items: flex-start;
       flex-wrap: wrap;
+      
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* ONLY apply touch-action: none to the actual canvases so drawing doesn't scroll the page */
+    #canvas-container canvas, #mini-canvas {
+      touch-action: none;
     }
 
     #ui-panel {
@@ -301,7 +303,7 @@
     </div>
 
     <div style="font-size: 13px; font-weight: 700; border: 3px solid var(--black); padding: 8px; transform: rotate(0.5deg);">
-      * touch/drag on grid to spawn.
+      * touch/drag on grid to spawn. outside canvas to scroll.
     </div>
 
     <button id="btn-export">export svg</button>
@@ -321,8 +323,7 @@
       { hex: "#3333ff", checked: true }, 
       { hex: "#ffea00", checked: true }, 
       { hex: "#ff3333", checked: true }, 
-      { hex: "#111111", checked: true },
-      { hex: "#00e676", checked: false } 
+      { hex: "#111111", checked: true }
     ];
     
     let customShapesData = {}; 
@@ -444,7 +445,7 @@
       if (miniPoints.length < 2) return; 
       let minX = Math.min(...miniPoints.map(p => p.x));
       let maxX = Math.max(...miniPoints.map(p => p.x));
-      let strokeW = Math.max(maxX - minX, 1); // avoid div by zero
+      let strokeW = Math.max(maxX - minX, 1); 
       
       let normalized = miniPoints.map(p => {
         return { nx: (p.x - minX) / strokeW, ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) };
@@ -514,7 +515,7 @@
             grid[nextCell.x][nextCell.y] = true;
             currentCell = nextCell;
           } else {
-            break; // No more empty neighbors, path is fully formed
+            break; 
           }
         }
       }
@@ -560,13 +561,13 @@
         let targetLen = p.nodes.length - 1;
         if (isAnimated) {
           if (p.animProgress < targetLen) {
-            p.animProgress = Math.min(p.animProgress + 0.25, targetLen); // increment speed
+            p.animProgress = Math.min(p.animProgress + 0.25, targetLen); 
             animationActive = true;
             forceRedraw = true;
           }
         } else {
           if (p.animProgress < targetLen) {
-            p.animProgress = targetLen; // instant reveal if animation is off
+            p.animProgress = targetLen; 
             forceRedraw = true;
           }
         }
@@ -603,10 +604,8 @@
       
       for (let i = 0; i < pts.length - 1; i++) {
         if (i < Math.floor(limit)) {
-          // Fully draw segment
           drawSegment(pts[i], pts[i+1], pathObj, 1.0);
         } else if (i === Math.floor(limit)) {
-          // Partially draw segment for animation
           let frac = limit - Math.floor(limit);
           if (frac > 0.01) drawSegment(pts[i], pts[i+1], pathObj, frac);
         }
@@ -669,7 +668,7 @@
             if (x <= maxDrawD) vertex(x, 0); 
             if (x + period/2 <= maxDrawD) { vertex(x + period/2, -amp); vertex(x + period/2, amp); }
           }
-          if (maxDrawD > d - 2) vertex(d, 0); // ensure closing
+          if (maxDrawD > d - 2) vertex(d, 0);
         } 
         else if (shapeType === 'square') {
           let period = 20;
