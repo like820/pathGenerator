@@ -29,7 +29,7 @@
       font-family: 'Source Sans 3', sans-serif;
     }
 
-    /* CRITICAL MOBILE TOUCH FIX: Prevent text selection, copy prompts, and pull-to-refresh globally */
+    /* CRITICAL MOBILE TOUCH FIX: Purely CSS based to prevent text selection and scroll hijacking */
     body, #canvas-container, canvas, #mini-canvas {
       touch-action: none;
       user-select: none;
@@ -152,10 +152,7 @@
       outline: 3px solid var(--black);
     }
 
-    .custom-color-btn {
-      grid-column: span 2;
-    }
-
+    .custom-color-btn { grid-column: span 2; }
     .custom-color-btn label {
       font-size: 12px !important;
       color: var(--black) !important;
@@ -196,7 +193,6 @@
       transform: translate(2px, 2px);
       box-shadow: 2px 2px 0px var(--black);
     }
-
     button:active {
       transform: translate(4px, 4px);
       box-shadow: 0px 0px 0px var(--black);
@@ -238,7 +234,6 @@
       font-size: 14px;
       margin-top: 5px;
     }
-    
     .toggle-lbl {
       display: flex;
       align-items: center;
@@ -261,7 +256,7 @@
       <label class="header" style="transform: rotate(1deg)">grid size</label>
       <div class="slider-row">
         <span>size: <span id="grid-val">12</span></span>
-        <input type="range" id="grid-select" min="5" max="25" value="12">
+        <input type="range" id="grid-select" min="6" max="20" value="12">
       </div>
     </div>
 
@@ -302,7 +297,7 @@
 
     <div class="toggles-row">
       <label class="toggle-lbl"><input type="checkbox" id="show-grid"> show grid</label>
-      <label class="toggle-lbl"><input type="checkbox" id="anim-toggle"> animated</label>
+      <label class="toggle-lbl"><input type="checkbox" id="anim-toggle"> animate strokes</label>
     </div>
 
     <div style="font-size: 13px; font-weight: 700; border: 3px solid var(--black); padding: 8px; transform: rotate(0.5deg);">
@@ -326,7 +321,8 @@
       { hex: "#3333ff", checked: true }, 
       { hex: "#ffea00", checked: true }, 
       { hex: "#ff3333", checked: true }, 
-      { hex: "#111111", checked: true }  
+      { hex: "#111111", checked: true },
+      { hex: "#00e676", checked: false } 
     ];
     
     let customShapesData = {}; 
@@ -336,12 +332,10 @@
     let cellSize = 40;
     
     let grid = [];
-    let finishedWalkers = []; // Store fully computed walkers here to fix bugs
-    let p5CanvasInst;
+    let allPaths = []; // Store fully computed paths here
     let forceRedraw = true; 
 
     const shapePoolContainer = document.getElementById('shape-pool');
-    
     function addShapeToPool(shapeName, isChecked = false) {
       let id = `shape-${shapeName.replace(/\s+/g, '-')}`;
       let checkedStr = isChecked ? 'checked' : '';
@@ -370,10 +364,8 @@
       forceRedraw = true;
     }
     INITIAL_COLORS.forEach(c => addColorToPool(c.hex, c.checked));
-
     document.getElementById('hidden-color-picker').addEventListener('change', (e) => addColorToPool(e.target.value, true));
 
-    // UI Event Listeners
     document.getElementById('min-weight-select').addEventListener('input', (e) => {
       document.getElementById('min-weight-val').innerText = e.target.value;
       if (parseInt(e.target.value) > parseInt(document.getElementById('max-weight-select').value)) {
@@ -452,10 +444,10 @@
       if (miniPoints.length < 2) return; 
       let minX = Math.min(...miniPoints.map(p => p.x));
       let maxX = Math.max(...miniPoints.map(p => p.x));
-      let strokeWidth = Math.max(maxX - minX, 1);
+      let strokeW = Math.max(maxX - minX, 1); // avoid div by zero
       
       let normalized = miniPoints.map(p => {
-        return { nx: (p.x - minX) / strokeWidth, ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) };
+        return { nx: (p.x - minX) / strokeW, ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) };
       });
       customShapeCount++;
       let shapeName = `custom ${customShapeCount}`;
@@ -469,8 +461,8 @@
     });
 
     function setup() {
-      p5CanvasInst = createCanvas(gridSize * cellSize, gridSize * cellSize, SVG);
-      p5CanvasInst.parent('canvas-container');
+      let p5c = createCanvas(gridSize * cellSize, gridSize * cellSize, SVG);
+      p5c.parent('canvas-container');
       frameRate(30); 
       initGridData();
       document.getElementById('btn-export').addEventListener('click', () => save("path_generator.svg"));
@@ -485,7 +477,7 @@
 
     function initGridData() {
       grid = [];
-      finishedWalkers = [];
+      allPaths = [];
       for (let i = 0; i < gridSize; i++) {
         grid[i] = [];
         for (let j = 0; j < gridSize; j++) grid[i][j] = false;
@@ -493,17 +485,18 @@
       forceRedraw = true;
     }
 
-    class Walker {
+    class PathObj {
       constructor(startCell, shapeType, col, weight) {
-        this.path = [startCell];
+        this.nodes = [startCell];
         this.shape = shapeType;
         this.color = col;
         this.weight = weight;
         this.animProgress = 0;
+        this.generateFullWalk();
       }
       
-      generateFull() {
-        let currentCell = this.path[0];
+      generateFullWalk() {
+        let currentCell = this.nodes[0];
         let directions = [{x: 1, y: 0}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 0, y: -1}];
         
         while(true) {
@@ -517,11 +510,11 @@
           }
           if (neighbors.length > 0) {
             let nextCell = neighbors[floor(random(neighbors.length))];
-            this.path.push(nextCell);
+            this.nodes.push(nextCell);
             grid[nextCell.x][nextCell.y] = true;
             currentCell = nextCell;
           } else {
-            break;
+            break; // No more empty neighbors, path is fully formed
           }
         }
       }
@@ -549,28 +542,31 @@
         let chosenColor = random(availableColors);
         let randomWeight = floor(random(minW, maxW + 1));
 
-        let w = new Walker({x: i, y: j}, chosenShape, chosenColor, randomWeight);
+        let p = new PathObj({x: i, y: j}, chosenShape, chosenColor, randomWeight);
         grid[i][j] = true; 
-        w.generateFull(); // Generate instantly in memory to avoid state bugs
-        finishedWalkers.push(w);
+        allPaths.push(p);
         forceRedraw = true;
       }
     }
 
-    // STRICT NATIVE P5 EVENT MAPPING - No touch overrides to ensure CSS fixes work properly.
     function mousePressed() { attemptSpawn(mouseX, mouseY); }
     function mouseDragged() { attemptSpawn(mouseX, mouseY); }
 
     function draw() {
       let isAnimated = document.getElementById('anim-toggle').checked;
       
-      // Check if any walkers need animation updates
       let animationActive = false;
-      if (isAnimated) {
-        for (let w of finishedWalkers) {
-          if (w.animProgress < w.path.length - 1) {
-            w.animProgress += 0.2; // Speed of path drawing
+      for (let p of allPaths) {
+        let targetLen = p.nodes.length - 1;
+        if (isAnimated) {
+          if (p.animProgress < targetLen) {
+            p.animProgress = Math.min(p.animProgress + 0.25, targetLen); // increment speed
             animationActive = true;
+            forceRedraw = true;
+          }
+        } else {
+          if (p.animProgress < targetLen) {
+            p.animProgress = targetLen; // instant reveal if animation is off
             forceRedraw = true;
           }
         }
@@ -580,9 +576,8 @@
         clear();
         if (document.getElementById('show-grid').checked) drawGridLines();
 
-        for (let w of finishedWalkers) {
-          let limit = isAnimated ? w.animProgress : w.path.length;
-          renderPath(w, limit);
+        for (let p of allPaths) {
+          renderPath(p);
         }
         
         if (!animationActive) forceRedraw = false;
@@ -600,24 +595,28 @@
       }
     }
 
-    function renderPath(walkerObj, progressLimit) {
-      let path = walkerObj.path;
-      if (path.length < 2) return;
+    function renderPath(pathObj) {
+      let pts = pathObj.nodes;
+      if (pts.length < 2) return;
 
-      for (let i = 0; i < path.length - 1; i++) {
-        if (i < Math.floor(progressLimit)) {
-          drawSegment(path[i], path[i+1], walkerObj, 1.0);
-        } else if (i === Math.floor(progressLimit)) {
-          let frac = progressLimit - Math.floor(progressLimit);
-          if (frac > 0.01) drawSegment(path[i], path[i+1], walkerObj, frac);
+      let limit = pathObj.animProgress;
+      
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (i < Math.floor(limit)) {
+          // Fully draw segment
+          drawSegment(pts[i], pts[i+1], pathObj, 1.0);
+        } else if (i === Math.floor(limit)) {
+          // Partially draw segment for animation
+          let frac = limit - Math.floor(limit);
+          if (frac > 0.01) drawSegment(pts[i], pts[i+1], pathObj, frac);
         }
       }
     }
 
-    function drawSegment(p1, p2, walkerObj, fraction) {
-      let shapeType = walkerObj.shape;
-      let sw = walkerObj.weight;
-      let col = walkerObj.color;
+    function drawSegment(p1, p2, pathObj, fraction) {
+      let shapeType = pathObj.shape;
+      let sw = pathObj.weight;
+      let col = pathObj.color;
 
       let x1 = p1.x * cellSize + cellSize / 2;
       let y1 = p1.y * cellSize + cellSize / 2;
@@ -632,7 +631,7 @@
       rotate(angle); 
       
       let amp = 6 + sw; 
-      let maxDrawD = d * fraction; // Handle fractional drawing for animation
+      let maxDrawD = d * fraction; 
 
       if (shapeType === 'dots') {
         fill(col);
@@ -670,7 +669,7 @@
             if (x <= maxDrawD) vertex(x, 0); 
             if (x + period/2 <= maxDrawD) { vertex(x + period/2, -amp); vertex(x + period/2, amp); }
           }
-          if (maxDrawD > d - 2) vertex(d, 0);
+          if (maxDrawD > d - 2) vertex(d, 0); // ensure closing
         } 
         else if (shapeType === 'square') {
           let period = 20;
