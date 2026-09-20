@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>path generator</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://unpkg.com/p5.js-svg@1.3.1"></script>
+
+  <style>
+    :root {
+      --bg: #f4f0eb;
+      --black: #111;
+      --red: #ff3333;
+      --yellow: #ffea00;
+      --blue: #3333ff;
+      --white: #ffffff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      text-transform: lowercase; /* strict lowercase everywhere */
+      font-family: 'Source Sans 3', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--black);
+      margin: 0;
+      padding: 15px;
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    #ui-panel {
+      width: 100%;
+      max-width: 340px;
+      background: var(--white);
+      border: 4px solid var(--black);
+      box-shadow: 8px 8px 0px var(--black);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+      margin: 0;
+      border-bottom: 4px dashed var(--black);
+      padding-bottom: 5px;
+      line-height: 1;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label.header {
+      font-weight: 900;
+      font-size: 16px;
+      background: var(--black);
+      color: var(--white);
+      padding: 4px 10px;
+      align-self: flex-start;
+      transform: rotate(-1deg);
+      margin-bottom: 2px;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .pool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .color-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .pool-item {
+      position: relative;
+    }
+
+    .pool-item input[type="checkbox"] {
+      opacity: 0;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      z-index: 2;
+      margin: 0;
+    }
+
+    .pool-item label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4px 2px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 3px solid var(--black);
+      background: var(--white);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.1s;
+      box-shadow: 3px 3px 0px var(--black);
+      height: 100%;
+      min-height: 32px;
+    }
+
+    .pool-item input[type="checkbox"]:checked + label {
+      background: var(--black);
+      color: var(--white);
+      transform: translate(3px, 3px);
+      box-shadow: 0px 0px 0px var(--black);
+    }
+
+    .color-grid .pool-item label { font-size: 0; height: 32px; }
+    
+    .color-grid .pool-item input[type="checkbox"]:checked + label {
+      border: 4px solid var(--white);
+      outline: 3px solid var(--black);
+    }
+
+    .custom-color-btn {
+      grid-column: span 2;
+    }
+
+    .custom-color-btn label {
+      font-size: 13px !important;
+      color: var(--black) !important;
+      background: var(--white) !important;
+      border: 3px dashed var(--black) !important;
+    }
+    
+    .custom-color-btn:hover label {
+      background: #eee !important;
+    }
+
+    button, input[type="range"] {
+      font-size: 16px;
+      font-weight: 800;
+      border: 4px solid var(--black);
+      background: var(--white);
+      padding: 8px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px var(--black);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      padding: 0;
+      height: 20px;
+      background: var(--black);
+      box-shadow: 3px 3px 0px var(--black);
+      flex-grow: 1;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 20px;
+      background: var(--white);
+      border: 2px solid var(--black);
+      cursor: ew-resize;
+    }
+
+    button:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px var(--black);
+    }
+
+    button:active {
+      transform: translate(4px, 4px);
+      box-shadow: 0px 0px 0px var(--black);
+    }
+
+    #btn-export { background: var(--red); color: var(--white); }
+    #btn-clear { background: var(--yellow); }
+    #btn-save-custom { background: var(--black); color: var(--white); font-size: 14px; padding: 6px; }
+
+    .drawer-container {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #mini-canvas {
+      border: 3px solid var(--black);
+      background: var(--bg);
+      cursor: crosshair;
+      touch-action: none;
+      width: 100px;
+      height: 100px;
+      flex-shrink: 0;
+    }
+
+    #canvas-container {
+      border: 4px solid var(--black);
+      box-shadow: 8px 8px 0px var(--black);
+      background: var(--white);
+      width: fit-content;
+      height: fit-content;
+      max-width: 100%;
+      overflow-x: auto;
+      touch-action: none;
+    }
+    
+    .instruction {
+      font-size: 13px; 
+      font-weight: 700;
+      border: 3px solid var(--black); 
+      padding: 8px;
+      background: var(--white);
+      transform: rotate(0.5deg);
+    }
+
+    .toggles-row {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    
+    .toggle-lbl {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #ui-panel { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui-panel">
+    <h1>path generator</h1>
+    
+    <div class="control-group">
+      <label class="header" style="transform: rotate(1deg)">grid size</label>
+      <div class="slider-row">
+        <span>cols: <span id="cols-val">12</span></span>
+        <input type="range" id="cols-select" min="5" max="25" value="12">
+      </div>
+      <div class="slider-row">
+        <span>rows: <span id="rows-val">12</span></span>
+        <input type="range" id="rows-select" min="5" max="25" value="12">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="header">shapes</label>
+      <div class="pool-grid" id="shape-pool">
+        <!-- JS populates this -->
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="header" style="transform: rotate(1.5deg)">draw custom</label>
+      <div class="drawer-container">
+        <canvas id="mini-canvas" width="100" height="100"></canvas>
+        <button id="btn-save-custom">add shape</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="header">colors</label>
+      <div class="pool-grid color-grid" id="color-pool">
+        <div class="pool-item custom-color-btn" id="add-color-btn">
+          <label for="hidden-color-picker">+ custom</label>
+          <input type="color" id="hidden-color-picker" style="opacity:0; position:absolute; inset:0; width:100%; height:100%; cursor:pointer;">
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="header" style="transform: rotate(0deg)">stroke range</label>
+      <div class="slider-row">
+        <span>min: <span id="min-weight-val">4</span>px</span>
+        <input type="range" id="min-weight-select" min="1" max="15" value="4">
+      </div>
+      <div class="slider-row">
+        <span>max: <span id="max-weight-val">8</span>px</span>
+        <input type="range" id="max-weight-select" min="1" max="15" value="8">
+      </div>
+    </div>
+
+    <div class="toggles-row">
+      <label class="toggle-lbl"><input type="checkbox" id="show-grid"> show grid</label>
+      <label class="toggle-lbl"><input type="checkbox" id="anim-toggle"> animated</label>
+    </div>
+
+    <p class="instruction">
+      * drag on the grid to spawn a walker.
+    </p>
+
+    <button id="btn-export">export svg</button>
+    <button id="btn-clear">clear grid</button>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    const BUILT_IN_SHAPES = [
+      "line", "sine", "square", "saw", "dots", "scribble", 
+      "water", "dither", "crazy", "dash", "coil", "ecg", "bounce"
+    ];
+    
+    // Default checked shapes
+    const DEFAULT_SHAPES = ["line", "sine", "square"];
+    
+    // Default checked colors
+    const INITIAL_COLORS = [
+      { hex: "#3333ff", checked: true }, // blue
+      { hex: "#ffea00", checked: true }, // yellow
+      { hex: "#ff3333", checked: true }, // red
+      { hex: "#111111", checked: true }  // black
+    ];
+    
+    let customShapesData = {}; 
+    let customShapeCount = 0;
+    
+    let gridCols = 12;
+    let gridRows = 12;
+    let cellSize = 40;
+    
+    let grid = [];
+    let finishedPaths = []; 
+    let currentWalker = null;
+    let p5CanvasInst;
+    
+    let animTime = 0;
+    let forceRedraw = true; // Use forceRedraw flag for static updates
+
+    const shapePoolContainer = document.getElementById('shape-pool');
+    
+    function addShapeToPool(shapeName, isChecked = false) {
+      let id = `shape-${shapeName.replace(/\s+/g, '-')}`;
+      let checkedStr = isChecked ? 'checked' : '';
+      
+      let div = document.createElement('div');
+      div.className = 'pool-item';
+      div.innerHTML = `
+        <input type="checkbox" id="${id}" value="${shapeName}" ${checkedStr}>
+        <label for="${id}">${shapeName}</label>
+      `;
+      shapePoolContainer.appendChild(div);
+      div.querySelector('input').addEventListener('change', () => forceRedraw = true);
+    }
+
+    BUILT_IN_SHAPES.forEach((shape) => {
+      addShapeToPool(shape, DEFAULT_SHAPES.includes(shape)); 
+    });
+
+    const colorPoolContainer = document.getElementById('color-pool');
+    const addColorBtn = document.getElementById('add-color-btn');
+
+    function addColorToPool(hex, isChecked = true) {
+      let cleanHex = hex.toLowerCase();
+      let id = `col-${cleanHex.replace('#', '')}`;
+      if (document.getElementById(id)) return; 
+      
+      let checkedStr = isChecked ? 'checked' : '';
+      let div = document.createElement('div');
+      div.className = 'pool-item';
+      div.innerHTML = `
+        <input type="checkbox" id="${id}" value="${cleanHex}" ${checkedStr}>
+        <label for="${id}" style="background-color: ${cleanHex};"></label>
+      `;
+      colorPoolContainer.insertBefore(div, addColorBtn);
+      div.querySelector('input').addEventListener('change', () => forceRedraw = true);
+      forceRedraw = true;
+    }
+
+    INITIAL_COLORS.forEach(c => addColorToPool(c.hex, c.checked));
+
+    document.getElementById('hidden-color-picker').addEventListener('change', (e) => {
+      addColorToPool(e.target.value, true);
+    });
+
+    document.getElementById('min-weight-select').addEventListener('input', (e) => {
+      document.getElementById('min-weight-val').innerText = e.target.value;
+      forceRedraw = true;
+    });
+    document.getElementById('max-weight-select').addEventListener('input', (e) => {
+      document.getElementById('max-weight-val').innerText = e.target.value;
+      forceRedraw = true;
+    });
+    
+    document.getElementById('cols-select').addEventListener('input', (e) => {
+      document.getElementById('cols-val').innerText = e.target.value;
+    });
+    document.getElementById('rows-select').addEventListener('input', (e) => {
+      document.getElementById('rows-val').innerText = e.target.value;
+    });
+
+    document.getElementById('cols-select').addEventListener('change', rebuildGrid);
+    document.getElementById('rows-select').addEventListener('change', rebuildGrid);
+    document.getElementById('show-grid').addEventListener('change', () => forceRedraw = true);
+    document.getElementById('anim-toggle').addEventListener('change', () => forceRedraw = true);
+
+    const miniCanvas = document.getElementById('mini-canvas');
+    const miniCtx = miniCanvas.getContext('2d');
+    let isDrawingMini = false;
+    let miniPoints = [];
+
+    function clearMiniCanvas() {
+      miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+      miniCtx.beginPath();
+      miniCtx.moveTo(0, miniCanvas.height/2);
+      miniCtx.lineTo(miniCanvas.width, miniCanvas.height/2);
+      miniCtx.strokeStyle = '#ddd';
+      miniCtx.lineWidth = 1;
+      miniCtx.setLineDash([4, 4]);
+      miniCtx.stroke();
+      miniCtx.setLineDash([]);
+      miniPoints = [];
+    }
+    clearMiniCanvas();
+
+    function getPointerPos(e) {
+      const rect = miniCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const scaleX = miniCanvas.width / rect.width;
+      const scaleY = miniCanvas.height / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    miniCanvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); 
+      isDrawingMini = true;
+      clearMiniCanvas();
+      const pos = getPointerPos(e);
+      miniPoints.push(pos);
+      miniCtx.beginPath();
+      miniCtx.moveTo(pos.x, pos.y);
+      miniCtx.strokeStyle = '#111';
+      miniCtx.lineWidth = 3;
+      miniCtx.lineCap = 'round';
+      miniCtx.lineJoin = 'round';
+    });
+
+    miniCanvas.addEventListener('pointermove', (e) => {
+      if (!isDrawingMini) return;
+      e.preventDefault();
+      const pos = getPointerPos(e);
+      miniPoints.push(pos);
+      miniCtx.lineTo(pos.x, pos.y);
+      miniCtx.stroke();
+    });
+
+    const stopDrawingMini = () => { isDrawingMini = false; };
+    miniCanvas.addEventListener('pointerup', stopDrawingMini);
+    miniCanvas.addEventListener('pointerleave', stopDrawingMini);
+    miniCanvas.addEventListener('pointercancel', stopDrawingMini);
+
+    document.getElementById('btn-save-custom').addEventListener('click', () => {
+      if (miniPoints.length < 2) return; 
+      
+      let minX = Math.min(...miniPoints.map(p => p.x));
+      let maxX = Math.max(...miniPoints.map(p => p.x));
+      let strokeWidth = Math.max(maxX - minX, 1);
+      
+      let normalized = miniPoints.map(p => {
+        return {
+          nx: (p.x - minX) / strokeWidth, // 0 to 1 along x axis
+          ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) // -1 to 1 along y axis
+        };
+      });
+
+      customShapeCount++;
+      let shapeName = `custom ${customShapeCount}`;
+      customShapesData[shapeName] = normalized;
+      
+      addShapeToPool(shapeName, true);
+      clearMiniCanvas();
+      
+      let btn = document.getElementById('btn-save-custom');
+      btn.innerText = "saved!";
+      setTimeout(() => {
+        btn.innerText = "add shape";
+      }, 1000);
+    });
+
+    function setup() {
+      p5CanvasInst = createCanvas(gridCols * cellSize, gridRows * cellSize, SVG);
+      p5CanvasInst.parent('canvas-container');
+      frameRate(30); 
+      initGridData();
+
+      document.getElementById('btn-export').addEventListener('click', () => save("path_generator.svg"));
+      document.getElementById('btn-clear').addEventListener('click', rebuildGrid);
+      
+      p5CanvasInst.elt.style.touchAction = 'none';
+    }
+
+    function rebuildGrid() {
+      gridCols = parseInt(document.getElementById('cols-select').value);
+      gridRows = parseInt(document.getElementById('rows-select').value);
+      resizeCanvas(gridCols * cellSize, gridRows * cellSize);
+      initGridData();
+      forceRedraw = true;
+    }
+
+    function initGridData() {
+      grid = [];
+      finishedPaths = [];
+      currentWalker = null;
+      for (let i = 0; i < gridCols; i++) {
+        grid[i] = [];
+        for (let j = 0; j < gridRows; j++) {
+          grid[i][j] = false;
+        }
+      }
+      forceRedraw = true;
+    }
+
+    function touchMoved(event) {
+      if (event.target === p5CanvasInst.elt) return false; 
+    }
+
+    function mouseDragged() {
+      if (mouseX < 0 || mouseX >= width || mouseY < 0 || mouseY >= height) return;
+      let i = floor(mouseX / cellSize);
+      let j = floor(mouseY / cellSize);
+      
+      if (i >= 0 && i < gridCols && j >= 0 && j < gridRows && !grid[i][j]) {
+        if (!currentWalker) startNewWalker(i, j);
+      }
+    }
+
+    function mouseReleased() {
+      if (currentWalker) {
+        // If we stop clicking, manually push the unfinished walker to finished
+        finishedPaths.push(currentWalker);
+        currentWalker = null;
+        forceRedraw = true;
+      }
+    }
+
+    function startNewWalker(i, j) {
+      let availableShapes = [];
+      document.querySelectorAll('#shape-pool input[type="checkbox"]').forEach(cb => {
+        if (cb.checked) availableShapes.push(cb.value);
+      });
+      
+      let availableColors = [];
+      document.querySelectorAll('#color-pool input[type="checkbox"]').forEach(cb => {
+        if (cb.id !== 'hidden-color-picker' && cb.checked) availableColors.push(cb.value);
+      });
+      
+      if (availableShapes.length === 0) availableShapes = ["line"];
+      if (availableColors.length === 0) availableColors = ["#111111"];
+
+      let minW = parseInt(document.getElementById('min-weight-select').value);
+      let maxW = parseInt(document.getElementById('max-weight-select').value);
+      
+      let actualMin = Math.min(minW, maxW);
+      let actualMax = Math.max(minW, maxW);
+      let randomWeight = floor(random(actualMin, actualMax + 1));
+
+      let chosenShape = random(availableShapes);
+      let chosenColor = random(availableColors);
+
+      currentWalker = new Walker({x: i, y: j}, chosenShape, chosenColor, randomWeight);
+      grid[i][j] = true;
+      forceRedraw = true; // Ensure it immediately renders
+    }
+
+    function draw() {
+      let isAnimated = document.getElementById('anim-toggle').checked;
+      let needsRender = isAnimated || forceRedraw;
+
+      // 1. STATE UPDATE
+      if (currentWalker) {
+        let nextCell = currentWalker.getNext();
+        if (nextCell) {
+          currentWalker.move(nextCell);
+          grid[nextCell.x][nextCell.y] = true;
+          needsRender = true;
+        } else {
+          // Path finished finding cells, lock it in immediately before render
+          finishedPaths.push(currentWalker);
+          currentWalker = null;
+          needsRender = true;
+        }
+      }
+
+      // 2. RENDER
+      if (needsRender) {
+        clear(); // Clear old DOM bloat
+        
+        let showGrid = document.getElementById('show-grid').checked;
+        if (showGrid) drawGridLines();
+
+        // Render completed paths
+        for (let p of finishedPaths) {
+          renderPath(p);
+        }
+        
+        // Render current active walker (if it exists)
+        if (currentWalker) {
+          renderPath(currentWalker);
+        }
+
+        forceRedraw = false; // Reset static redraw flag
+      }
+      
+      // Advance animation time if enabled
+      if (isAnimated) {
+        animTime++;
+      }
+    }
+
+    function drawGridLines() {
+      strokeWeight(1);
+      stroke(220);
+      for (let i = 0; i <= gridCols; i++) line(i * cellSize, 0, i * cellSize, height);
+      for (let j = 0; j <= gridRows; j++) line(0, j * cellSize, width, j * cellSize);
+      
+      fill(180);
+      noStroke();
+      for (let i = 0; i <= gridCols; i++) {
+        for (let j = 0; j <= gridRows; j++) {
+          circle(i * cellSize, j * cellSize, 4);
+        }
+      }
+    }
+
+    function renderPath(walkerObj) {
+      let path = walkerObj.getPath();
+      if (path.length < 2) return;
+
+      for (let i = 0; i < path.length - 1; i++) {
+        drawSegment(path[i], path[i+1], walkerObj);
+      }
+    }
+
+    function drawSegment(p1, p2, walkerObj) {
+      let shapeType = walkerObj.shape;
+      let sw = walkerObj.weight;
+      let col = walkerObj.color;
+
+      let x1 = p1.x * cellSize + cellSize / 2;
+      let y1 = p1.y * cellSize + cellSize / 2;
+      let x2 = p2.x * cellSize + cellSize / 2;
+      let y2 = p2.y * cellSize + cellSize / 2;
+
+      let d = dist(x1, y1, x2, y2);
+      let angle = atan2(y2 - y1, x2 - x1);
+
+      push();
+      translate(x1, y1);
+      rotate(angle); 
+      
+      let amp = 6 + sw; 
+      let isAnimated = document.getElementById('anim-toggle').checked;
+
+      if (shapeType === 'dots') {
+        fill(col);
+        noStroke();
+        for (let x = 0; x <= d; x += sw * 2.5 + 4) circle(x, 0, sw * 1.5);
+      } 
+      else if (shapeType.startsWith('custom')) {
+        let pts = customShapesData[shapeType];
+        if (pts) {
+          stroke(col);
+          strokeWeight(sw);
+          strokeJoin(ROUND);
+          strokeCap(ROUND);
+          noFill();
+          let period = 40;
+          for (let startX = 0; startX < d; startX += period) {
+            beginShape();
+            for (let i = 0; i < pts.length; i++) {
+              let drawX = startX + pts[i].nx * period;
+              let drawY = pts[i].ny * amp * 1.5; 
+              if (drawX <= d + period*0.1) vertex(drawX, drawY);
+            }
+            endShape();
+          }
+        }
+      }
+      else {
+        stroke(col);
+        strokeWeight(sw);
+        strokeJoin(ROUND);
+        strokeCap(ROUND);
+        noFill();
+
+        beginShape();
+        if (shapeType === 'line') {
+          vertex(0, 0); vertex(d, 0);
+        } 
+        else if (shapeType === 'sine') {
+          for (let x = 0; x <= d; x += 3) {
+            let offset = isAnimated ? animTime * 0.2 : 0;
+            vertex(x, sin(map(x, 0, d, 0, TWO_PI * 2) - offset) * amp);
+          }
+        } 
+        else if (shapeType === 'saw') {
+          let period = 15;
+          for (let x = 0; x <= d; x += period) {
+            vertex(x, 0); vertex(x + period/2, -amp); vertex(x + period/2, amp);
+          }
+          vertex(d, 0);
+        } 
+        else if (shapeType === 'square') {
+          let period = 20;
+          for (let x = 0; x <= d; x += period) {
+            vertex(x, 0); vertex(x, -amp);
+            vertex(min(x + period/2, d), -amp); vertex(min(x + period/2, d), amp);
+            vertex(min(x + period, d), amp); vertex(min(x + period, d), 0);
+          }
+        }
+        else if (shapeType === 'scribble') {
+          for (let x = 0; x <= d; x += 6) vertex(x + random(-sw, sw), random(-amp, amp));
+          vertex(d, 0);
+        }
+        else if (shapeType === 'water') {
+          for (let x = 0; x <= d; x += 4) {
+            let globalX = (x1 + x * cos(angle)) * 0.02;
+            let globalY = (y1 + x * sin(angle)) * 0.02;
+            let offset = isAnimated ? animTime * 0.03 : 0;
+            let y = map(noise(globalX, globalY, offset), 0, 1, -amp*2, amp*2);
+            vertex(x, y);
+          }
+        }
+        else if (shapeType === 'dither') {
+          for (let x = 0; x <= d; x += sw + 3) {
+            let h = random(amp * 0.5, amp * 1.5);
+            vertex(x, -h); vertex(x, h);
+          }
+        }
+        else if (shapeType === 'crazy') {
+          for (let x = 0; x <= d; x += 10) vertex(x, random(-amp * 5, amp * 5));
+        }
+        else if (shapeType === 'dash') {
+          endShape();
+          for (let x = 0; x < d; x += sw * 4) line(x, 0, min(x + sw * 2, d), 0);
+          beginShape(); 
+        }
+        else if (shapeType === 'coil') {
+          for (let t = 0; t <= d; t += 2) vertex(t + cos(t * 0.4) * amp, sin(t * 0.4) * amp);
+        }
+        else if (shapeType === 'ecg') {
+          for (let x = 0; x <= d; x += 2) {
+            let y = 0;
+            let offset = isAnimated ? animTime * 3 : 0;
+            let cycle = (x - offset) % 50; 
+            if (cycle < 0) cycle += 50;
+            if (cycle > 20 && cycle < 25) y = -amp * 2.5; 
+            else if (cycle >= 25 && cycle < 30) y = amp * 2;
+            else if (cycle >= 30 && cycle < 33) y = -amp * 0.5;
+            vertex(x, y);
+          }
+        }
+        else if (shapeType === 'bounce') {
+          for (let x = 0; x <= d; x += 2) {
+            let offset = isAnimated ? animTime * 2 : 0;
+            vertex(x, -Math.abs(sin((x - offset) * 0.1)) * amp * 2);
+          }
+        }
+        endShape();
+      }
+      pop();
+    }
+
+    class Walker {
+      constructor(startCell, shapeType, col, weight) {
+        this.path = [startCell];
+        this.currentCell = startCell;
+        this.shape = shapeType;
+        this.color = col;
+        this.weight = weight;
+        this.directions = [
+          {x: 1, y: 0}, {x: 0, y: 1}, 
+          {x: -1, y: 0}, {x: 0, y: -1}
+        ];
+      }
+
+      getNext() {
+        let neighbors = [];
+        for (let dir of this.directions) {
+          let nx = this.currentCell.x + dir.x;
+          let ny = this.currentCell.y + dir.y;
+          if (nx >= 0 && nx < gridCols && ny >= 0 && ny < gridRows && !grid[nx][ny]) {
+            neighbors.push({x: nx, y: ny});
+          }
+        }
+        if (neighbors.length > 0) return neighbors[floor(random(neighbors.length))];
+        return null;
+      }
+
+      move(cell) {
+        this.currentCell = cell;
+        this.path.push(cell);
+      }
+
+      getPath() { return this.path; }
+    }
+  </script>
+</body>
+</html>
