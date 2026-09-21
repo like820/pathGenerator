@@ -29,7 +29,6 @@
       font-family: 'Source Sans 3', sans-serif;
     }
 
-    /* CRITICAL FIX: Allow scrolling on the body, but prevent text selection globally */
     body {
       background-color: var(--bg);
       color: var(--black);
@@ -47,7 +46,7 @@
     }
 
     /* ONLY apply touch-action: none to the actual canvases so drawing doesn't scroll the page */
-    #canvas-container canvas, #mini-canvas {
+    #canvas-container, #mini-canvas {
       touch-action: none;
     }
 
@@ -200,22 +199,30 @@
       box-shadow: 0px 0px 0px var(--black);
     }
 
-    #btn-export { background: var(--red); color: var(--white); }
+    #btn-export { background: var(--red); color: var(--white); flex: 1; }
+    #btn-export-png { background: var(--blue); color: var(--white); flex: 1; }
     #btn-clear { background: var(--yellow); }
-    #btn-save-custom { background: var(--black); color: var(--white); font-size: 13px; padding: 6px; }
+    #btn-save-custom { background: var(--black); color: var(--white); font-size: 13px; padding: 6px; flex: 1; }
 
     .drawer-container {
       display: flex;
+      flex-direction: column;
       gap: 10px;
       align-items: center;
+    }
+
+    .drawer-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
     }
 
     #mini-canvas {
       border: 3px solid var(--black);
       background: var(--bg);
       cursor: crosshair;
-      width: 100px;
-      height: 100px;
+      width: 120px;
+      height: 120px;
       flex-shrink: 0;
     }
 
@@ -226,7 +233,7 @@
       width: fit-content;
       height: fit-content;
       max-width: 100%;
-      overflow-x: auto;
+      overflow: hidden; /* SVG handles its own bounds */
     }
 
     .toggles-row {
@@ -242,10 +249,24 @@
       gap: 5px;
       cursor: pointer;
     }
+    
+    .hint-text {
+      font-size: 11px;
+      text-align: center;
+      font-weight: 700;
+      opacity: 0.7;
+    }
+
+    .export-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
 
     @media (max-width: 768px) {
       body { flex-direction: column; }
       #ui-panel { max-width: 100%; }
+      #canvas-container { max-width: 100%; overflow-x: auto; }
     }
   </style>
 </head>
@@ -255,10 +276,14 @@
     <h1>pathgenerator</h1>
     
     <div class="control-group">
-      <label class="header" style="transform: rotate(1deg)">grid size</label>
+      <label class="header" style="transform: rotate(1deg)">grid dimensions</label>
       <div class="slider-row">
-        <span>size: <span id="grid-val">12</span></span>
-        <input type="range" id="grid-select" min="6" max="20" value="12">
+        <span style="width: 35px;">x: <span id="grid-x-val">12</span></span>
+        <input type="range" id="grid-x-select" min="4" max="25" value="12">
+      </div>
+      <div class="slider-row">
+        <span style="width: 35px;">y: <span id="grid-y-val">12</span></span>
+        <input type="range" id="grid-y-select" min="4" max="25" value="12">
       </div>
     </div>
 
@@ -270,8 +295,13 @@
     <div class="control-group">
       <label class="header" style="transform: rotate(1.5deg)">draw custom</label>
       <div class="drawer-container">
-        <canvas id="mini-canvas" width="100" height="100"></canvas>
-        <button id="btn-save-custom">add shape</button>
+        <div class="drawer-row">
+          <canvas id="mini-canvas" width="120" height="120"></canvas>
+          <div style="display:flex; flex-direction:column; gap:8px; justify-content:center; width:100%;">
+             <button id="btn-save-custom">add shape</button>
+             <span class="hint-text">double tap to clear</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -299,14 +329,17 @@
 
     <div class="toggles-row">
       <label class="toggle-lbl"><input type="checkbox" id="show-grid"> show grid</label>
-      <label class="toggle-lbl"><input type="checkbox" id="anim-toggle"> animate strokes</label>
+      <label class="toggle-lbl"><input type="checkbox" id="anim-toggle"> animate</label>
     </div>
 
     <div style="font-size: 13px; font-weight: 700; border: 3px solid var(--black); padding: 8px; transform: rotate(0.5deg);">
       * touch/drag on grid to spawn. outside canvas to scroll.
     </div>
 
-    <button id="btn-export">export svg</button>
+    <div class="export-row">
+      <button id="btn-export">.svg</button>
+      <button id="btn-export-png">.png</button>
+    </div>
     <button id="btn-clear">clear grid</button>
   </div>
 
@@ -329,7 +362,8 @@
     let customShapesData = {}; 
     let customShapeCount = 0;
     
-    let gridSize = 12;
+    let gridWidth = 12;
+    let gridHeight = 12;
     let cellSize = 40;
     
     let grid = [];
@@ -385,17 +419,24 @@
       forceRedraw = true;
     });
     
-    document.getElementById('grid-select').addEventListener('input', (e) => {
-      document.getElementById('grid-val').innerText = e.target.value;
+    document.getElementById('grid-x-select').addEventListener('input', (e) => {
+      document.getElementById('grid-x-val').innerText = e.target.value;
     });
-    document.getElementById('grid-select').addEventListener('change', rebuildGrid);
+    document.getElementById('grid-y-select').addEventListener('input', (e) => {
+      document.getElementById('grid-y-val').innerText = e.target.value;
+    });
+
+    document.getElementById('grid-x-select').addEventListener('change', rebuildGrid);
+    document.getElementById('grid-y-select').addEventListener('change', rebuildGrid);
     document.getElementById('show-grid').addEventListener('change', () => forceRedraw = true);
     document.getElementById('anim-toggle').addEventListener('change', () => forceRedraw = true);
 
     const miniCanvas = document.getElementById('mini-canvas');
     const miniCtx = miniCanvas.getContext('2d');
     let isDrawingMini = false;
-    let miniPoints = [];
+    let miniStrokes = []; // Array of strokes, each stroke is an array of points
+    let currentStroke = [];
+    let lastTap = 0;
 
     function clearMiniCanvas() {
       miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
@@ -407,9 +448,40 @@
       miniCtx.setLineDash([4, 4]);
       miniCtx.stroke();
       miniCtx.setLineDash([]);
-      miniPoints = [];
+      miniStrokes = [];
     }
     clearMiniCanvas();
+
+    function redrawMiniStrokes() {
+      // Clear and redraw guide
+      miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+      miniCtx.beginPath();
+      miniCtx.moveTo(0, miniCanvas.height/2);
+      miniCtx.lineTo(miniCanvas.width, miniCanvas.height/2);
+      miniCtx.strokeStyle = '#ddd';
+      miniCtx.lineWidth = 1;
+      miniCtx.setLineDash([4, 4]);
+      miniCtx.stroke();
+      miniCtx.setLineDash([]);
+
+      // Draw all saved strokes and current stroke
+      let all = [...miniStrokes];
+      if (currentStroke.length > 0) all.push(currentStroke);
+
+      for (let stroke of all) {
+        if (stroke.length < 2) continue;
+        miniCtx.beginPath();
+        miniCtx.moveTo(stroke[0].x, stroke[0].y);
+        miniCtx.strokeStyle = '#111';
+        miniCtx.lineWidth = 3;
+        miniCtx.lineCap = 'round';
+        miniCtx.lineJoin = 'round';
+        for (let i = 1; i < stroke.length; i++) {
+          miniCtx.lineTo(stroke[i].x, stroke[i].y);
+        }
+        miniCtx.stroke();
+      }
+    }
 
     function getPointerPos(e) {
       const rect = miniCanvas.getBoundingClientRect();
@@ -417,42 +489,63 @@
     }
 
     miniCanvas.addEventListener('pointerdown', (e) => {
+      // Double tap/click to clear
+      let currentTime = new Date().getTime();
+      let tapLength = currentTime - lastTap;
+      if (tapLength < 350 && tapLength > 0) {
+        clearMiniCanvas();
+        e.preventDefault();
+        return;
+      }
+      lastTap = currentTime;
+
       isDrawingMini = true;
-      clearMiniCanvas();
       const pos = getPointerPos(e);
-      miniPoints.push(pos);
-      miniCtx.beginPath();
-      miniCtx.moveTo(pos.x, pos.y);
-      miniCtx.strokeStyle = '#111';
-      miniCtx.lineWidth = 3;
-      miniCtx.lineCap = 'round';
-      miniCtx.lineJoin = 'round';
+      currentStroke = [pos];
+      redrawMiniStrokes();
+      e.preventDefault();
     });
 
     miniCanvas.addEventListener('pointermove', (e) => {
       if (!isDrawingMini) return;
       const pos = getPointerPos(e);
-      miniPoints.push(pos);
-      miniCtx.lineTo(pos.x, pos.y);
-      miniCtx.stroke();
+      currentStroke.push(pos);
+      redrawMiniStrokes();
+      e.preventDefault();
     });
 
-    const stopDrawingMini = () => { isDrawingMini = false; };
+    const stopDrawingMini = (e) => {
+      if (isDrawingMini) {
+        isDrawingMini = false;
+        if (currentStroke.length > 1) {
+          miniStrokes.push([...currentStroke]);
+        }
+        currentStroke = [];
+        redrawMiniStrokes();
+      }
+    };
     miniCanvas.addEventListener('pointerup', stopDrawingMini);
     miniCanvas.addEventListener('pointerleave', stopDrawingMini);
 
     document.getElementById('btn-save-custom').addEventListener('click', () => {
-      if (miniPoints.length < 2) return; 
-      let minX = Math.min(...miniPoints.map(p => p.x));
-      let maxX = Math.max(...miniPoints.map(p => p.x));
+      if (miniStrokes.length === 0) return; 
+      
+      // Find global min and max X across all strokes to normalize properly
+      let allPoints = miniStrokes.flat();
+      let minX = Math.min(...allPoints.map(p => p.x));
+      let maxX = Math.max(...allPoints.map(p => p.x));
       let strokeW = Math.max(maxX - minX, 1); 
       
-      let normalized = miniPoints.map(p => {
-        return { nx: (p.x - minX) / strokeW, ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) };
+      // Normalize each stroke
+      let normalizedStrokes = miniStrokes.map(stroke => {
+        return stroke.map(p => {
+          return { nx: (p.x - minX) / strokeW, ny: (p.y - miniCanvas.height/2) / (miniCanvas.height/2) };
+        });
       });
+
       customShapeCount++;
       let shapeName = `custom ${customShapeCount}`;
-      customShapesData[shapeName] = normalized;
+      customShapesData[shapeName] = normalizedStrokes;
       addShapeToPool(shapeName, true);
       clearMiniCanvas();
       
@@ -462,26 +555,65 @@
     });
 
     function setup() {
-      let p5c = createCanvas(gridSize * cellSize, gridSize * cellSize, SVG);
+      gridWidth = parseInt(document.getElementById('grid-x-select').value);
+      gridHeight = parseInt(document.getElementById('grid-y-select').value);
+      
+      let p5c = createCanvas(gridWidth * cellSize, gridHeight * cellSize, SVG);
       p5c.parent('canvas-container');
       frameRate(30); 
       initGridData();
+      
       document.getElementById('btn-export').addEventListener('click', () => save("path_generator.svg"));
+      
+      // Implement PNG Export via SVG serialization
+      document.getElementById('btn-export-png').addEventListener('click', () => {
+        const svgElement = document.querySelector('#canvas-container svg');
+        if (!svgElement) return;
+        
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        
+        const svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+        const DOMURL = window.URL || window.webkitURL || window;
+        const url = DOMURL.createObjectURL(svgBlob);
+        
+        img.onload = function() {
+          // Fill background color
+          ctx.fillStyle = getComputedStyle(document.body).backgroundColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // Draw the SVG
+          ctx.drawImage(img, 0, 0);
+          DOMURL.revokeObjectURL(url);
+          
+          const pngUrl = canvas.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.download = "path_generator.png";
+          a.href = pngUrl;
+          a.click();
+        };
+        img.src = url;
+      });
+
       document.getElementById('btn-clear').addEventListener('click', rebuildGrid);
     }
 
     function rebuildGrid() {
-      gridSize = parseInt(document.getElementById('grid-select').value);
-      resizeCanvas(gridSize * cellSize, gridSize * cellSize);
+      gridWidth = parseInt(document.getElementById('grid-x-select').value);
+      gridHeight = parseInt(document.getElementById('grid-y-select').value);
+      resizeCanvas(gridWidth * cellSize, gridHeight * cellSize);
       initGridData();
     }
 
     function initGridData() {
       grid = [];
       allPaths = [];
-      for (let i = 0; i < gridSize; i++) {
+      for (let i = 0; i < gridWidth; i++) {
         grid[i] = [];
-        for (let j = 0; j < gridSize; j++) grid[i][j] = false;
+        for (let j = 0; j < gridHeight; j++) grid[i][j] = false;
       }
       forceRedraw = true;
     }
@@ -505,7 +637,8 @@
           for (let dir of directions) {
             let nx = currentCell.x + dir.x;
             let ny = currentCell.y + dir.y;
-            if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize && !grid[nx][ny]) {
+            // Use independent gridWidth and gridHeight
+            if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && !grid[nx][ny]) {
               neighbors.push({x: nx, y: ny});
             }
           }
@@ -525,7 +658,8 @@
       let i = floor(mx / cellSize);
       let j = floor(my / cellSize);
       
-      if (i >= 0 && i < gridSize && j >= 0 && j < gridSize && !grid[i][j]) {
+      // Use independent gridWidth and gridHeight
+      if (i >= 0 && i < gridWidth && j >= 0 && j < gridHeight && !grid[i][j]) {
         let availableShapes = [];
         document.querySelectorAll('#shape-pool input[type="checkbox"]:checked').forEach(cb => availableShapes.push(cb.value));
         if (availableShapes.length === 0) availableShapes = ["line"];
@@ -574,7 +708,7 @@
       }
 
       if (forceRedraw || animationActive) {
-        clear();
+        clear(); // Clear SVG context efficiently
         if (document.getElementById('show-grid').checked) drawGridLines();
 
         for (let p of allPaths) {
@@ -588,11 +722,11 @@
     function drawGridLines() {
       strokeWeight(1);
       stroke(220);
-      for (let i = 0; i <= gridSize; i++) line(i * cellSize, 0, i * cellSize, height);
-      for (let j = 0; j <= gridSize; j++) line(0, j * cellSize, width, j * cellSize);
+      for (let i = 0; i <= gridWidth; i++) line(i * cellSize, 0, i * cellSize, height);
+      for (let j = 0; j <= gridHeight; j++) line(0, j * cellSize, width, j * cellSize);
       fill(180); noStroke();
-      for (let i = 0; i <= gridSize; i++) {
-        for (let j = 0; j <= gridSize; j++) circle(i * cellSize, j * cellSize, 4);
+      for (let i = 0; i <= gridWidth; i++) {
+        for (let j = 0; j <= gridHeight; j++) circle(i * cellSize, j * cellSize, 4);
       }
     }
 
@@ -638,18 +772,21 @@
         for (let x = 0; x <= maxDrawD; x += sw * 2.5 + 4) circle(x, 0, sw * 1.5);
       } 
       else if (shapeType.startsWith('custom')) {
-        let pts = customShapesData[shapeType];
-        if (pts) {
+        let strokes = customShapesData[shapeType];
+        if (strokes) {
           stroke(col); strokeWeight(sw); strokeJoin(ROUND); strokeCap(ROUND); noFill();
           let period = 40;
           for (let startX = 0; startX < maxDrawD; startX += period) {
-            beginShape();
-            for (let i = 0; i < pts.length; i++) {
-              let drawX = startX + pts[i].nx * period;
-              let drawY = pts[i].ny * amp * 1.5; 
-              if (drawX <= maxDrawD + period*0.1) vertex(drawX, drawY);
+            // Draw multi-stroke
+            for (let stroke of strokes) {
+              beginShape();
+              for (let i = 0; i < stroke.length; i++) {
+                let drawX = startX + stroke[i].nx * period;
+                let drawY = stroke[i].ny * amp * 1.5; 
+                if (drawX <= maxDrawD + period*0.1) vertex(drawX, drawY);
+              }
+              endShape();
             }
-            endShape();
           }
         }
       }
